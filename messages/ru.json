@@ -1,0 +1,32 @@
+{
+  "HomePage": {
+    "title": "Привет мир!",
+    "description": "Это приложение Next.js с использованием next-intl."
+  },
+  "TodoApp": {
+    "title": "Aura Todo",
+    "subtitle": "Организуйте свои мысли, улучшайте свою жизнь.",
+    "placeholder": "Что нужно сделать?",
+    "remaining": "{count} осталось",
+    "completed_stats": "{count} завершено",
+    "no_tasks": "Задач не найдено.",
+    "filters": {
+      "all": "Все",
+      "active": "Активные",
+      "completed": "Завершенные"
+    },
+    "table": {
+      "task": "Задача",
+      "status": "Статус",
+      "priority": "Приоритет",
+      "date": "Дата",
+      "actions": "Действия"
+    },
+    "priorities": {
+      "low": "Низкий",
+      "medium": "Средний",
+      "high": "Высокий"
+    },
+    "footer": "Сделано с <heart/> с помощью Next.js и Tailwind"
+  }
+}
