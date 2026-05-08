@@ -1,0 +1,32 @@
+{
+  "HomePage": {
+    "title": "Hello world!",
+    "description": "This is a Next.js app with next-intl."
+  },
+  "TodoApp": {
+    "title": "Aura Todo",
+    "subtitle": "Organize your thoughts, elevate your life.",
+    "placeholder": "What needs to be done?",
+    "remaining": "{count} remaining",
+    "completed_stats": "{count} completed",
+    "no_tasks": "No tasks found for this filter.",
+    "filters": {
+      "all": "All",
+      "active": "Active",
+      "completed": "Completed"
+    },
+    "table": {
+      "task": "Task",
+      "status": "Status",
+      "priority": "Priority",
+      "date": "Date",
+      "actions": "Actions"
+    },
+    "priorities": {
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High"
+    },
+    "footer": "Built with <heart/> using Next.js & Tailwind"
+  }
+}
