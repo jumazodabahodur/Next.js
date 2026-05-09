@@ -1,33 +1,41 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Plus, Trash2, CheckCircle2, Circle, ListTodo, Filter, Calendar, Edit2, Check, X, AlertCircle } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { 
+  Plus, Trash2, CheckCircle2, Circle, ListTodo, 
+  Filter, Calendar, Edit2, Check, X, Loader2, 
+  Search, ArrowUpDown, ArrowUp, ArrowDown, MoreVertical,
+  AlertCircle
+} from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { 
+  useGetTodosQuery, 
+  useAddTodoMutation, 
+  useUpdateTodoMutation, 
+  useDeleteTodoMutation,
+  Todo
+} from '@/api/todo.api';
 
 type Priority = 'low' | 'medium' | 'high';
-
-interface Todo {
-  id: string;
-  text: string;
-  completed: boolean;
-  priority: Priority;
-  createdAt: number;
-}
-
-const INITIAL_DATA: Todo[] = [
-  { id: '1', text: 'Learn Next.js App Router', completed: true, priority: 'high', createdAt: Date.now() - 86400000 * 2 },
-  { id: '2', text: 'Implement Premium UI with Glassmorphism', completed: true, priority: 'high', createdAt: Date.now() - 86400000 },
-  { id: '3', text: 'Add Localization (EN/RU)', completed: true, priority: 'medium', createdAt: Date.now() - 43200000 },
-  { id: '4', text: 'Build a CRUD Table', completed: false, priority: 'medium', createdAt: Date.now() - 100000 },
-  { id: '5', text: 'Deploy to Vercel', completed: false, priority: 'low', createdAt: Date.now() },
-];
+type SortField = 'text' | 'priority' | 'createdAt' | 'completed';
+type SortOrder = 'asc' | 'desc';
 
 export default function TodoPage() {
   const t = useTranslations('TodoApp');
-  const [todos, setTodos] = useState<Todo[]>([]);
+  
+  // RTK Query Hooks (Queries & Mutations)
+  const { data: todos = [], isLoading, isError, refetch } = useGetTodosQuery();
+  const [addTodo, { isLoading: isAdding }] = useAddTodoMutation();
+  const [updateTodo, { isLoading: isUpdating }] = useUpdateTodoMutation();
+  const [deleteTodo, { isLoading: isDeleting }] = useDeleteTodoMutation();
+
+  // Local State
   const [inputValue, setInputValue] = useState('');
   const [priorityValue, setPriorityValue] = useState<Priority>('medium');
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortField, setSortField] = useState<SortField>('createdAt');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [isMounted, setIsMounted] = useState(false);
   
   // Editing state
@@ -35,71 +43,108 @@ export default function TodoPage() {
   const [editingText, setEditingText] = useState('');
   const [editingPriority, setEditingPriority] = useState<Priority>('medium');
 
-  // Load from localStorage
   useEffect(() => {
-    const saved = localStorage.getItem('aura-todos-v2');
-    if (saved) {
-      try {
-        setTodos(JSON.parse(saved));
-      } catch (e) {
-        console.error("Failed to parse todos", e);
-        setTodos(INITIAL_DATA);
-      }
-    } else {
-      setTodos(INITIAL_DATA);
-    }
     setIsMounted(true);
   }, []);
 
-  // Save to localStorage
-  useEffect(() => {
-    if (isMounted) {
-      localStorage.setItem('aura-todos-v2', JSON.stringify(todos));
-    }
-  }, [todos, isMounted]);
-
-  const addTodo = (e?: React.FormEvent) => {
+  // CRUD Handlers
+  const handleAddTodo = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!inputValue.trim()) return;
 
-    const newTodo: Todo = {
-      id: crypto.randomUUID(),
-      text: inputValue.trim(),
-      completed: false,
-      priority: priorityValue,
-      createdAt: Date.now(),
-    };
-
-    setTodos([newTodo, ...todos]);
-    setInputValue('');
+    try {
+      await addTodo({
+        text: inputValue.trim(),
+        completed: false,
+        priority: priorityValue,
+        createdAt: Date.now(),
+      }).unwrap();
+      setInputValue('');
+    } catch (err) {
+      console.error('Failed to add todo:', err);
+    }
   };
 
-  const toggleTodo = (id: string) => {
-    setTodos(todos.map(todo => 
-      todo.id === id ? { ...todo, completed: !todo.completed } : todo
-    ));
+  const handleToggleTodo = async (todo: Todo) => {
+    try {
+      await updateTodo({
+        id: todo.id,
+        completed: !todo.completed
+      }).unwrap();
+    } catch (err) {
+      console.error('Failed to toggle todo:', err);
+    }
   };
 
-  const deleteTodo = (id: string) => {
-    setTodos(todos.filter(todo => todo.id !== id));
+  const handleDeleteTodo = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this task?')) return;
+    try {
+      await deleteTodo(id).unwrap();
+    } catch (err) {
+      console.error('Failed to delete todo:', err);
+    }
   };
 
   const startEditing = (todo: Todo) => {
     setEditingId(todo.id);
-    setEditingText(todo.text);
-    setEditingPriority(todo.priority);
+    setEditingText(todo.text || '');
+    setEditingPriority(todo.priority || 'medium');
   };
 
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (!editingId) return;
-    setTodos(todos.map(todo => 
-      todo.id === editingId ? { 
-        ...todo, 
-        text: editingText.trim() || todo.text,
+    try {
+      await updateTodo({
+        id: editingId,
+        text: editingText.trim(),
         priority: editingPriority
-      } : todo
-    ));
-    setEditingId(null);
+      }).unwrap();
+      setEditingId(null);
+    } catch (err) {
+      console.error('Failed to save edit:', err);
+    }
+  };
+
+  // Logic: Filtering, Searching & Sorting
+  const processedTodos = useMemo(() => {
+    let result = [...todos];
+
+    // Filter by status
+    if (filter === 'active') result = result.filter(t => !t.completed);
+    if (filter === 'completed') result = result.filter(t => t.completed);
+
+    // Filter by search term
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      result = result.filter(t => t.text.toLowerCase().includes(term));
+    }
+
+    // Sort
+    result.sort((a, b) => {
+      let comparison = 0;
+      if (sortField === 'priority') {
+        const priorityMap = { high: 3, medium: 2, low: 1 };
+        comparison = priorityMap[a.priority] - priorityMap[b.priority];
+      } else if (sortField === 'text') {
+        comparison = a.text.localeCompare(b.text);
+      } else if (sortField === 'completed') {
+        comparison = (a.completed ? 1 : 0) - (b.completed ? 1 : 0);
+      } else {
+        comparison = a.createdAt - b.createdAt;
+      }
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+
+    return result;
+  }, [todos, filter, searchTerm, sortField, sortOrder]);
+
+  const toggleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder('asc');
+    }
   };
 
   const switchLanguage = (lang: string) => {
@@ -107,97 +152,115 @@ export default function TodoPage() {
     window.location.reload();
   };
 
-  const filteredTodos = todos.filter(todo => {
-    if (filter === 'active') return !todo.completed;
-    if (filter === 'completed') return todo.completed;
-    return true;
-  });
-
   const stats = {
     total: todos.length,
     completed: todos.filter(t => t.completed).length,
     remaining: todos.filter(t => !t.completed).length
   };
 
-  const getPriorityColor = (p: Priority) => {
-    switch(p) {
+  const getPriorityColor = (p?: Priority) => {
+    const priority = p || 'medium';
+    switch(priority) {
       case 'high': return 'text-red-400 bg-red-400/10 border-red-400/20';
       case 'medium': return 'text-amber-400 bg-amber-400/10 border-amber-400/20';
       case 'low': return 'text-green-400 bg-green-400/10 border-green-400/20';
+      default: return 'text-slate-400 bg-slate-400/10 border-slate-400/20';
     }
+  };
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return <ArrowUpDown className="w-3 h-3 opacity-30" />;
+    return sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-brand-primary" /> : <ArrowDown className="w-3 h-3 text-brand-primary" />;
   };
 
   if (!isMounted) return null;
 
   return (
-    <main className="max-w-5xl mx-auto px-4 py-12 min-h-screen flex flex-col gap-8">
+    <main className="max-w-6xl mx-auto px-4 py-12 min-h-screen flex flex-col gap-8 antialiased">
       {/* Header */}
-      <header className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-3">
-          <div className="p-3 rounded-2xl bg-brand-primary/10 border border-brand-primary/20">
-            <ListTodo className="w-8 h-8 text-brand-primary animate-float" />
+      <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+        <div className="flex items-center gap-4">
+          <div className="p-4 rounded-2xl bg-brand-primary/10 border border-brand-primary/20 shadow-xl shadow-brand-primary/5">
+            <ListTodo className="w-10 h-10 text-brand-primary animate-float" />
           </div>
           <div>
-            <h1 className="text-4xl font-bold tracking-tight text-gradient">{t('title')}</h1>
-            <p className="text-slate-400 text-sm">{t('subtitle')}</p>
+            <h1 className="text-4xl font-extrabold tracking-tight text-gradient">{t('title')}</h1>
+            <p className="text-slate-400 text-sm font-medium">{t('subtitle')}</p>
           </div>
         </div>
 
-        {/* Language Switcher */}
-        <div className="flex gap-2 glass p-1">
-          <button 
-            onClick={() => switchLanguage('en')}
-            className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${document.cookie.includes('NEXT_LOCALE=en') || !document.cookie.includes('NEXT_LOCALE') ? 'bg-white text-black' : 'text-slate-400 hover:text-white'}`}
-          >
-            EN
-          </button>
-          <button 
-            onClick={() => switchLanguage('ru')}
-            className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${document.cookie.includes('NEXT_LOCALE=ru') ? 'bg-white text-black' : 'text-slate-400 hover:text-white'}`}
-          >
-            RU
-          </button>
+        <div className="flex items-center gap-4 w-full md:w-auto">
+          {/* Search Bar */}
+          <div className="relative flex-1 md:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+            <input 
+              type="text" 
+              placeholder="Search tasks..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2 text-sm outline-none focus:border-brand-primary/50 focus:ring-1 focus:ring-brand-primary/50 transition-all"
+            />
+          </div>
+
+          {/* Language Switcher */}
+          <div className="flex gap-1 glass p-1 h-10">
+            <button 
+              onClick={() => switchLanguage('en')}
+              className={`px-3 rounded-lg text-xs font-bold transition-all ${document.cookie.includes('NEXT_LOCALE=en') || !document.cookie.includes('NEXT_LOCALE') ? 'bg-white text-black shadow-lg' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+            >
+              EN
+            </button>
+            <button 
+              onClick={() => switchLanguage('ru')}
+              className={`px-3 rounded-lg text-xs font-bold transition-all ${document.cookie.includes('NEXT_LOCALE=ru') ? 'bg-white text-black shadow-lg' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+            >
+              RU
+            </button>
+          </div>
         </div>
       </header>
 
       {/* Input Section */}
-      <section className="glass p-1">
-        <form onSubmit={addTodo} className="flex items-center gap-2">
+      <section className="glass p-1 shadow-2xl shadow-black/20">
+        <form onSubmit={handleAddTodo} className="flex items-center gap-2">
           <input
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             placeholder={t('placeholder')}
-            className="flex-1 bg-transparent border-none outline-none px-6 py-4 text-lg placeholder:text-slate-500"
+            className="flex-1 bg-transparent border-none outline-none px-6 py-4 text-lg placeholder:text-slate-500 font-medium"
           />
-          <select 
-            value={priorityValue}
-            onChange={(e) => setPriorityValue(e.target.value as Priority)}
-            className="bg-white/5 border border-white/10 rounded-xl px-4 py-2 outline-none text-sm text-slate-300 mr-2"
-          >
-            <option value="low" className="bg-slate-900">{t('priorities.low')}</option>
-            <option value="medium" className="bg-slate-900">{t('priorities.medium')}</option>
-            <option value="high" className="bg-slate-900">{t('priorities.high')}</option>
-          </select>
-          <button
-            type="submit"
-            className="p-3 mr-1 rounded-xl bg-brand-primary hover:bg-brand-secondary transition-all duration-300 shadow-lg shadow-brand-primary/20 group"
-          >
-            <Plus className="w-6 h-6 group-hover:rotate-90 transition-transform duration-300" />
-          </button>
+          <div className="flex items-center gap-2 pr-2">
+            <select 
+              value={priorityValue}
+              onChange={(e) => setPriorityValue(e.target.value as Priority)}
+              className="bg-white/5 border border-white/10 rounded-xl px-4 py-2 outline-none text-sm text-slate-300 transition-colors focus:border-brand-primary/50"
+            >
+              <option value="low" className="bg-slate-900">{t('priorities.low')}</option>
+              <option value="medium" className="bg-slate-900">{t('priorities.medium')}</option>
+              <option value="high" className="bg-slate-900">{t('priorities.high')}</option>
+            </select>
+            <button
+              type="submit"
+              disabled={isAdding || !inputValue.trim()}
+              className="p-3 rounded-xl bg-brand-primary hover:bg-brand-secondary transition-all duration-300 shadow-lg shadow-brand-primary/20 group disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isAdding ? <Loader2 className="w-6 h-6 animate-spin" /> : <Plus className="w-6 h-6 group-hover:rotate-90 transition-transform duration-300" />}
+            </button>
+          </div>
         </form>
       </section>
 
       {/* Stats & Filters */}
-      <section className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex gap-2">
+      <section className="flex flex-wrap items-center justify-between gap-4 px-2">
+        <div className="flex gap-2 p-1 bg-white/5 rounded-full border border-white/10">
           {(['all', 'active', 'completed'] as const).map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
+              className={`px-5 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300 ${
                 filter === f 
-                  ? 'bg-white text-black shadow-lg' 
+                  ? 'bg-white text-black shadow-lg scale-105' 
                   : 'text-slate-400 hover:text-white hover:bg-white/5'
               }`}
             >
@@ -206,69 +269,122 @@ export default function TodoPage() {
           ))}
         </div>
         
-        <div className="text-sm text-slate-400 flex gap-4">
-          <span>{t('remaining', { count: stats.remaining })}</span>
-          <span>{t('completed_stats', { count: stats.completed })}</span>
+        <div className="flex items-center gap-6">
+          <div className="flex flex-col items-end">
+            <span className="text-[10px] uppercase font-bold text-slate-500 tracking-widest leading-none mb-1">Progress</span>
+            <div className="text-sm font-bold flex gap-4">
+              <span className="text-brand-primary">{stats.remaining} <span className="text-[10px] text-slate-500 uppercase">Left</span></span>
+              <span className="text-brand-accent">{stats.completed} <span className="text-[10px] text-slate-500 uppercase">Done</span></span>
+            </div>
+          </div>
         </div>
       </section>
 
       {/* Todo Table */}
-      <section className="glass overflow-hidden">
+      <section className="glass overflow-hidden relative min-h-[400px] shadow-2xl">
+        {(isLoading || isError) && (
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-md z-20 flex flex-col items-center justify-center gap-4">
+            {isLoading ? (
+              <>
+                <div className="relative">
+                  <Loader2 className="w-12 h-12 text-brand-primary animate-spin" />
+                  <div className="absolute inset-0 w-12 h-12 border-4 border-brand-primary/20 rounded-full"></div>
+                </div>
+                <p className="text-slate-300 font-medium animate-pulse">Syncing with cloud...</p>
+              </>
+            ) : (
+              <>
+                <AlertCircle className="w-12 h-12 text-red-400" />
+                <p className="text-red-400 font-medium">Failed to load tasks</p>
+                <button onClick={() => refetch()} className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm transition-all">Try Again</button>
+              </>
+            )}
+          </div>
+        )}
+
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-white/10 bg-white/5">
-                <th className="px-6 py-4 text-sm font-bold uppercase tracking-wider text-slate-400 w-16">{t('table.status')}</th>
-                <th className="px-6 py-4 text-sm font-bold uppercase tracking-wider text-slate-400">{t('table.task')}</th>
-                <th className="px-6 py-4 text-sm font-bold uppercase tracking-wider text-slate-400 w-32">{t('table.priority')}</th>
-                <th className="px-6 py-4 text-sm font-bold uppercase tracking-wider text-slate-400 w-32">{t('table.date')}</th>
-                <th className="px-6 py-4 text-sm font-bold uppercase tracking-wider text-slate-400 w-32 text-right">{t('table.actions')}</th>
+              <tr className="border-b border-white/10 bg-white/[0.03]">
+                <th 
+                  className="px-6 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 w-20 cursor-pointer hover:text-slate-300 transition-colors"
+                  onClick={() => toggleSort('completed')}
+                >
+                  <div className="flex items-center gap-2">{t('table.status')} <SortIcon field="completed" /></div>
+                </th>
+                <th 
+                  className="px-6 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 cursor-pointer hover:text-slate-300 transition-colors"
+                  onClick={() => toggleSort('text')}
+                >
+                  <div className="flex items-center gap-2">{t('table.task')} <SortIcon field="text" /></div>
+                </th>
+                <th 
+                  className="px-6 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 w-36 cursor-pointer hover:text-slate-300 transition-colors"
+                  onClick={() => toggleSort('priority')}
+                >
+                  <div className="flex items-center gap-2">{t('table.priority')} <SortIcon field="priority" /></div>
+                </th>
+                <th 
+                  className="px-6 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 w-40 cursor-pointer hover:text-slate-300 transition-colors"
+                  onClick={() => toggleSort('createdAt')}
+                >
+                  <div className="flex items-center gap-2">{t('table.date')} <SortIcon field="createdAt" /></div>
+                </th>
+                <th className="px-6 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 w-32 text-right">{t('table.actions')}</th>
               </tr>
             </thead>
-            <tbody>
-              {filteredTodos.length === 0 ? (
+            <tbody className="divide-y divide-white/5">
+              {processedTodos.length === 0 && !isLoading ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-slate-500 italic">
-                    <div className="flex flex-col items-center gap-2">
-                      <Filter className="w-8 h-8 opacity-20" />
-                      <p>{t('no_tasks')}</p>
+                  <td colSpan={5} className="px-6 py-24 text-center">
+                    <div className="flex flex-col items-center gap-4 max-w-xs mx-auto">
+                      <div className="p-6 rounded-full bg-white/5 border border-white/10">
+                        <Filter className="w-12 h-12 text-slate-600" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-slate-300 mb-1">No tasks found</h3>
+                        <p className="text-slate-500 text-sm">{searchTerm ? "Try adjusting your search or filters" : "Your task list is empty. Start by adding one!"}</p>
+                      </div>
                     </div>
                   </td>
                 </tr>
               ) : (
-                filteredTodos.map((todo) => (
+                processedTodos.map((todo) => (
                   <tr 
                     key={todo.id} 
-                    className={`group border-b border-white/5 last:border-none transition-colors hover:bg-white/[0.02] ${todo.completed ? 'opacity-60' : ''}`}
+                    className={`group transition-all hover:bg-white/[0.04] ${todo.completed ? 'opacity-50 grayscale-[0.5]' : ''}`}
                   >
                     <td className="px-6 py-4">
                       <button
-                        onClick={() => toggleTodo(todo.id)}
-                        className="transition-transform duration-300 active:scale-90"
+                        onClick={() => handleToggleTodo(todo)}
+                        disabled={isUpdating}
+                        className="relative transition-transform duration-300 active:scale-90 disabled:opacity-50"
                       >
                         {todo.completed ? (
-                          <CheckCircle2 className="w-6 h-6 text-brand-accent" />
+                          <CheckCircle2 className="w-7 h-7 text-brand-accent drop-shadow-[0_0_8px_rgba(236,72,153,0.3)]" />
                         ) : (
-                          <Circle className="w-6 h-6 text-slate-500 hover:text-brand-primary transition-colors" />
+                          <Circle className="w-7 h-7 text-slate-600 hover:text-brand-primary transition-colors" />
                         )}
                       </button>
                     </td>
                     <td className="px-6 py-4">
                       {editingId === todo.id ? (
-                        <input
-                          type="text"
-                          value={editingText}
-                          onChange={(e) => setEditingText(e.target.value)}
-                          onKeyDown={(e) => e.key === 'Enter' && saveEdit()}
-                          className="bg-white/10 border border-brand-primary/30 rounded px-2 py-1 outline-none text-white w-full"
-                          autoFocus
-                        />
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={editingText}
+                            onChange={(e) => setEditingText(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && saveEdit()}
+                            className="bg-white/10 border border-brand-primary/50 rounded-xl px-3 py-2 outline-none text-white w-full font-medium"
+                            autoFocus
+                          />
+                        </div>
                       ) : (
-                        <p className={`text-lg transition-all duration-300 ${
-                          todo.completed ? 'line-through text-slate-500' : 'text-slate-200'
-                        }`}>
-                          {todo.text}
-                        </p>
+                          <p className={`text-base font-semibold transition-all duration-300 ${
+                            todo.completed ? 'line-through text-slate-500' : 'text-slate-200'
+                          }`}>
+                            {todo.text || todo.name || todo.fullName || todo.firstName || 'Untitled Task'}
+                          </p>
                       )}
                     </td>
                     <td className="px-6 py-4">
@@ -276,33 +392,33 @@ export default function TodoPage() {
                         <select 
                           value={editingPriority}
                           onChange={(e) => setEditingPriority(e.target.value as Priority)}
-                          className="bg-slate-800 border border-brand-primary/30 rounded px-2 py-1 text-xs outline-none text-white"
+                          className="bg-slate-800 border border-white/10 rounded-lg px-3 py-1.5 text-xs outline-none text-white w-full"
                         >
                           <option value="low">{t('priorities.low')}</option>
                           <option value="medium">{t('priorities.medium')}</option>
                           <option value="high">{t('priorities.high')}</option>
                         </select>
                       ) : (
-                        <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${getPriorityColor(todo.priority)}`}>
-                          {t(`priorities.${todo.priority}`)}
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${getPriorityColor(todo.priority)}`}>
+                          {t(`priorities.${todo.priority || 'medium'}`)}
                         </span>
                       )}
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex items-center gap-2 text-xs text-slate-500">
-                        <Calendar className="w-3 h-3" />
-                        {new Date(todo.createdAt).toLocaleDateString()}
+                      <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
+                        <Calendar className="w-3.5 h-3.5 opacity-50" />
+                        {new Date(todo.createdAt || Date.now()).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         {editingId === todo.id ? (
                           <>
-                            <button onClick={saveEdit} className="p-2 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-all">
-                              <Check className="w-4 h-4" />
+                            <button onClick={saveEdit} className="p-2 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-all">
+                              <Check className="w-5 h-5" />
                             </button>
-                            <button onClick={() => setEditingId(null)} className="p-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-all">
-                              <X className="w-4 h-4" />
+                            <button onClick={() => setEditingId(null)} className="p-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all">
+                              <X className="w-5 h-5" />
                             </button>
                           </>
                         ) : (
@@ -310,14 +426,17 @@ export default function TodoPage() {
                             <button 
                               onClick={() => startEditing(todo)}
                               className="p-2 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-all"
+                              title="Edit task"
                             >
                               <Edit2 className="w-4 h-4" />
                             </button>
                             <button 
-                              onClick={() => deleteTodo(todo.id)}
+                              onClick={() => handleDeleteTodo(todo.id)}
+                              disabled={isDeleting}
                               className="p-2 rounded-lg hover:bg-red-500/10 text-slate-400 hover:text-red-400 transition-all"
+                              title="Delete task"
                             >
-                              <Trash2 className="w-4 h-4" />
+                              {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                             </button>
                           </>
                         )}
@@ -332,12 +451,19 @@ export default function TodoPage() {
       </section>
 
       {/* Footer / Info */}
-      <footer className="mt-auto py-8 text-center border-t border-white/5">
-        <p className="text-slate-500 text-xs flex items-center justify-center gap-2">
-          {t.rich('footer', {
-            heart: (chunks) => <span className="text-brand-accent animate-pulse">❤️</span>
-          })}
-        </p>
+      <footer className="mt-auto py-12 text-center border-t border-white/5">
+        <div className="flex flex-col items-center gap-4">
+          <p className="text-slate-500 text-xs font-bold tracking-[0.2em] uppercase">
+            {t.rich('footer', {
+              heart: (chunks) => <span className="text-brand-accent animate-pulse mx-1">❤️</span>
+            })}
+          </p>
+          <div className="flex gap-4">
+            <div className="w-8 h-1 bg-brand-primary rounded-full opacity-20"></div>
+            <div className="w-8 h-1 bg-brand-secondary rounded-full opacity-20"></div>
+            <div className="w-8 h-1 bg-brand-accent rounded-full opacity-20"></div>
+          </div>
+        </div>
       </footer>
     </main>
   );
