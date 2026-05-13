@@ -1,56 +1,33 @@
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
+import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react"
+import { IData, IPostPayload } from "@/store/todo.types"
 
-export interface Todo {
-  id: string;
-  text?: string;
-  name?: string;
-  fullName?: string;
-  firstName?: string;
-  completed: boolean;
-  priority: 'low' | 'medium' | 'high';
-  createdAt: number;
-}
+const api = "https://6966216af6de16bde44c5161.mockapi.io/"
 
 export const todoApi = createApi({
   reducerPath: 'todoApi',
-  // Updated base URL to use the new project provided by the user
-  baseQuery: fetchBaseQuery({ baseUrl: 'https://6966216af6de16bde44c5161.mockapi.io/' }),
+  baseQuery: fetchBaseQuery({ baseUrl: api }),
   tagTypes: ['Todo'],
-  endpoints: (builder) => ({
-    getTodos: builder.query<Todo[], void>({
-      // Changed resource from 'todos' to 'students' as per the new URL
+  endpoints: (build) => ({
+    getTodos: build.query<IData[], void>({
       query: () => 'students',
-      providesTags: ['Todo'],
+      providesTags: ['Todo']
     }),
-    addTodo: builder.mutation<Todo, Partial<Todo>>({
-      query: (body) => ({
-        url: 'students',
-        method: 'POST',
-        body,
-      }),
-      invalidatesTags: ['Todo'],
-    }),
-    updateTodo: builder.mutation<Todo, Partial<Todo> & { id: string }>({
-      query: ({ id, ...patch }) => ({
-        url: `students/${id}`,
-        method: 'PUT',
-        body: patch,
-      }),
-      invalidatesTags: ['Todo'],
-    }),
-    deleteTodo: builder.mutation<{ success: boolean; id: string }, string>({
+    deleteTodo: build.mutation<void, number>({
       query: (id) => ({
         url: `students/${id}`,
-        method: 'DELETE',
+        method: "DELETE",
       }),
-      invalidatesTags: ['Todo'],
+      invalidatesTags: ['Todo']
     }),
+    postTodo: build.mutation<void, IPostPayload>({
+      query: (newTodo) => ({
+        url: 'students',
+        method: 'POST',
+        body: newTodo
+      }),
+      invalidatesTags: ['Todo']
+    })
   }),
 })
 
-export const { 
-  useGetTodosQuery, 
-  useAddTodoMutation, 
-  useUpdateTodoMutation, 
-  useDeleteTodoMutation 
-} = todoApi
+export const { useGetTodosQuery, useDeleteTodoMutation, usePostTodoMutation } = todoApi
