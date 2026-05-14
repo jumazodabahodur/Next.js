@@ -1,13 +1,17 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { getTodos, postTodo, deleteTodo, updateTodo } from "@/api/tanstack-todo.api"
 import { IData, IPostPayload } from "@/store/todo.types"
-import { Trash2, Edit2, Plus, Loader2, RefreshCw, X } from "lucide-react"
+import { Trash2, Edit2, Plus, Loader2, RefreshCw, X, Sun, Moon } from "lucide-react"
+import { useTheme } from "next-themes"
 
 export default function HomePage() {
   const queryClient = useQueryClient()
+  const { theme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+  
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [formData, setFormData] = useState<IPostPayload>({
@@ -17,7 +21,11 @@ export default function HomePage() {
     status: false
   })
 
-  // Queries
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Queriess
   const { data: todos, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['todos'],
     queryFn: getTodos
@@ -74,26 +82,36 @@ export default function HomePage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6 pt-12 space-y-8">
-      <div className="flex justify-between items-center bg-white/5 p-6 rounded-2xl border border-white/10 backdrop-blur-md">
+    <div className="max-w-6xl mx-auto p-6 pt-12 space-y-8 transition-colors duration-500">
+      <div className="flex justify-between items-center bg-white shadow-sm dark:shadow-none dark:bg-white/5 p-6 rounded-2xl border border-slate-200 dark:border-white/10 backdrop-blur-md transition-colors duration-500">
         <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent">
             User Management
           </h1>
-          <p className="text-slate-400 mt-1">Manage your team members and their contact information</p>
+          <p className="text-slate-500 dark:text-slate-400 mt-1 transition-colors duration-500">Manage your team members and their contact information</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-3 items-center">
+          {mounted && (
+            <button
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              className="p-2.5 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 hover:bg-slate-200 dark:hover:bg-white/10 transition-all text-slate-700 dark:text-slate-300"
+              aria-label="Toggle Dark Mode"
+            >
+              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+          )}
+
           <button 
             onClick={() => refetch()}
             disabled={isFetching}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-sm font-medium"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 hover:bg-slate-200 dark:hover:bg-white/10 transition-all text-sm font-medium text-slate-700 dark:text-slate-200"
           >
             <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
             Refresh
           </button>
           <button 
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-500 hover:bg-blue-600 transition-all text-sm font-medium text-white shadow-lg shadow-blue-500/20"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 transition-all text-sm font-medium text-white shadow-lg shadow-blue-500/20"
           >
             <Plus className="w-4 h-4" />
             Add User
@@ -101,62 +119,62 @@ export default function HomePage() {
         </div>
       </div>
 
-      <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden backdrop-blur-md shadow-xl">
+      <div className="bg-white shadow-xl dark:shadow-none dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden backdrop-blur-md transition-colors duration-500">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-slate-300 whitespace-nowrap">
-            <thead className="text-xs uppercase bg-white/5 border-b border-white/10">
+          <table className="w-full text-left text-sm text-slate-600 dark:text-slate-300 whitespace-nowrap">
+            <thead className="text-xs uppercase bg-slate-50 dark:bg-white/5 border-b border-slate-200 dark:border-white/10 transition-colors duration-500">
               <tr>
-                <th className="px-6 py-4 font-medium">ID</th>
-                <th className="px-6 py-4 font-medium">Name</th>
-                <th className="px-6 py-4 font-medium">Email</th>
-                <th className="px-6 py-4 font-medium">Phone</th>
-                <th className="px-6 py-4 font-medium">Status</th>
-                <th className="px-6 py-4 font-medium text-right">Actions</th>
+                <th className="px-6 py-4 font-medium text-slate-500 dark:text-slate-300">ID</th>
+                <th className="px-6 py-4 font-medium text-slate-500 dark:text-slate-300">Name</th>
+                <th className="px-6 py-4 font-medium text-slate-500 dark:text-slate-300">Email</th>
+                <th className="px-6 py-4 font-medium text-slate-500 dark:text-slate-300">Phone</th>
+                <th className="px-6 py-4 font-medium text-slate-500 dark:text-slate-300">Status</th>
+                <th className="px-6 py-4 font-medium text-right text-slate-500 dark:text-slate-300">Actions</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="transition-colors duration-500">
               {isLoading ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
-                    <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-500" />
+                  <td colSpan={6} className="px-6 py-12 text-center text-slate-500 dark:text-slate-400">
+                    <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600 dark:text-blue-500" />
                     Loading users...
                   </td>
                 </tr>
               ) : isError ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-red-400">
+                  <td colSpan={6} className="px-6 py-12 text-center text-rose-500 dark:text-red-400">
                     Failed to load data. Please try refreshing.
                   </td>
                 </tr>
               ) : todos?.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
+                  <td colSpan={6} className="px-6 py-12 text-center text-slate-500 dark:text-slate-400">
                     No users found. Create one to get started!
                   </td>
                 </tr>
               ) : (
                 todos?.map((item) => (
-                  <tr key={item.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
-                    <td className="px-6 py-4 text-slate-500">#{item.id}</td>
-                    <td className="px-6 py-4 font-medium text-white">{item.name}</td>
-                    <td className="px-6 py-4 text-blue-300">{item.email}</td>
+                  <tr key={item.id} className="border-b border-slate-100 dark:border-white/5 hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors duration-500">
+                    <td className="px-6 py-4 text-slate-400 dark:text-slate-500">#{item.id}</td>
+                    <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">{item.name}</td>
+                    <td className="px-6 py-4 text-blue-600 dark:text-blue-300">{item.email}</td>
                     <td className="px-6 py-4">{item.phone}</td>
                     <td className="px-6 py-4">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${item.status ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'}`}>
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${item.status ? 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20' : 'bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20'}`}>
                         {item.status ? 'Active' : 'Inactive'}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right space-x-2">
                       <button 
                         onClick={() => openModalForEdit(item)}
-                        className="p-2 inline-flex bg-white/5 rounded-lg hover:bg-blue-500/20 hover:text-blue-400 transition-colors text-slate-400"
+                        className="p-2 inline-flex bg-slate-100 dark:bg-white/5 rounded-lg hover:bg-blue-100 hover:text-blue-600 dark:hover:bg-blue-500/20 dark:hover:text-blue-400 transition-colors text-slate-500 dark:text-slate-400"
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button 
                         onClick={() => deleteMutation.mutate(item.id)}
                         disabled={deleteMutation.isPending}
-                        className="p-2 inline-flex bg-white/5 rounded-lg hover:bg-red-500/20 hover:text-red-400 transition-colors text-slate-400 disabled:opacity-50"
+                        className="p-2 inline-flex bg-slate-100 dark:bg-white/5 rounded-lg hover:bg-rose-100 hover:text-rose-600 dark:hover:bg-red-500/20 dark:hover:text-red-400 transition-colors text-slate-500 dark:text-slate-400 disabled:opacity-50"
                       >
                         {deleteMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                       </button>
@@ -170,47 +188,47 @@ export default function HomePage() {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-slate-900 border border-white/10 rounded-2xl shadow-2xl p-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm transition-all duration-500">
+          <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl p-6 transition-colors duration-500">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-semibold text-white">
+              <h2 className="text-xl font-semibold text-slate-900 dark:text-white">
                 {editingId ? 'Edit User' : 'Add New User'}
               </h2>
-              <button onClick={closeModal} className="text-slate-400 hover:text-white transition-colors">
+              <button onClick={closeModal} className="text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-400 mb-1">Name</label>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-400 mb-1">Name</label>
                 <input 
                   type="text" 
                   value={formData.name}
                   onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                  className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all duration-300"
                   required 
                   placeholder="John Doe"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-400 mb-1">Email</label>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-400 mb-1">Email</label>
                 <input 
                   type="email" 
                   value={formData.email}
                   onChange={(e) => setFormData({...formData, email: e.target.value})}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                  className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all duration-300"
                   required 
-                  placeholder="john@example.com"
+                  placeholder="john@gmail.com"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-400 mb-1">Phone</label>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-400 mb-1">Phone</label>
                 <input 
                   type="text" 
                   value={formData.phone}
                   onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                  className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all duration-300"
                   required 
                   placeholder="+1 (555) 000-0000"
                 />
@@ -222,23 +240,23 @@ export default function HomePage() {
                   id="status"
                   checked={formData.status}
                   onChange={(e) => setFormData({...formData, status: e.target.checked})}
-                  className="w-4 h-4 rounded border-white/20 bg-white/5 text-blue-500 focus:ring-blue-500/50 accent-blue-500"
+                  className="w-4 h-4 rounded border-slate-300 dark:border-white/20 bg-slate-50 dark:bg-white/5 text-blue-600 dark:text-blue-500 focus:ring-blue-500/50 accent-blue-600 dark:accent-blue-500"
                 />
-                <label htmlFor="status" className="text-sm font-medium text-slate-300">Active Status</label>
+                <label htmlFor="status" className="text-sm font-medium text-slate-700 dark:text-slate-300">Active Status</label>
               </div>
 
-              <div className="flex justify-end gap-3 pt-6 mt-6 border-t border-white/10">
+              <div className="flex justify-end gap-3 pt-6 mt-6 border-t border-slate-100 dark:border-white/10 transition-colors duration-500">
                 <button 
                   type="button" 
                   onClick={closeModal}
-                  className="px-4 py-2 rounded-xl text-slate-300 hover:bg-white/5 transition-colors font-medium text-sm"
+                  className="px-4 py-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors font-medium text-sm"
                 >
                   Cancel
                 </button>
                 <button 
                   type="submit" 
                   disabled={createMutation.isPending || updateMutation.isPending}
-                  className="flex items-center gap-2 px-6 py-2 rounded-xl bg-blue-500 hover:bg-blue-600 transition-all text-sm font-medium text-white shadow-lg shadow-blue-500/20 disabled:opacity-50"
+                  className="flex items-center gap-2 px-6 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 transition-all text-sm font-medium text-white shadow-lg shadow-blue-500/20 disabled:opacity-50"
                 >
                   {(createMutation.isPending || updateMutation.isPending) && <Loader2 className="w-4 h-4 animate-spin" />}
                   {editingId ? 'Save Changes' : 'Create User'}
