@@ -229,9 +229,7 @@ export default function HomePage() {
                   value={formData.phone}
                   onChange={(e) => setFormData({...formData, phone: e.target.value})}
                   className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all duration-300"
-                  required 
-                  placeholder="+1 (555) 000-0000"
-                />
+                  required                 />
               </div>
               
               <div className="flex items-center gap-3 pt-2">
